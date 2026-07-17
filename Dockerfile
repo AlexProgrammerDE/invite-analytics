@@ -1,4 +1,4 @@
-FROM node:22-alpine AS base
+FROM node:24-alpine AS base
 
 WORKDIR /app
 
@@ -8,7 +8,7 @@ RUN npm install --production=false
 COPY . .
 RUN npx tsup src/index.ts --format esm
 
-FROM node:22-alpine AS runner
+FROM node:24-alpine AS runner
 
 WORKDIR /app
 
