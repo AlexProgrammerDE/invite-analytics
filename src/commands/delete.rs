@@ -19,6 +19,7 @@ pub async fn delete(
 ) -> Result<(), Error> {
     let guild_id = ctx.guild_id().context("command is missing a guild ID")?;
     let guild_id = guild_id.to_string();
+    ctx.defer_ephemeral().await?;
     let code = normalize_invite_code(&code);
     let Some(invite) = ctx.data().repository.find_invite(&guild_id, &code).await? else {
         ctx.send(
@@ -33,17 +34,9 @@ pub async fn delete(
     };
 
     let revoke = revoke.unwrap_or(true);
-    ctx.data().repository.delete_invite(invite.id).await?;
-    ctx.data().cache.remove_invite(&guild_id, &code).await?;
-
     let revoked = if revoke {
-        match ctx
-            .serenity_context()
-            .http
-            .delete_invite(&code, Some("Deleted via InviteAnalytics"))
-            .await
-        {
-            Ok(_) => true,
+        match ctx.data().discord_api.delete_invite(&code).await {
+            Ok(()) => true,
             Err(error) => {
                 tracing::warn!(
                     %error,
@@ -56,6 +49,13 @@ pub async fn delete(
     } else {
         false
     };
+    ctx.data()
+        .repository
+        .stop_tracking(invite.id, revoked)
+        .await?;
+    if revoked {
+        ctx.data().cache.remove_invite(&guild_id, &code).await?;
+    }
 
     ctx.data()
         .repository
@@ -85,7 +85,10 @@ pub async fn delete(
             .embed(
                 embeds::success()
                     .title("Invite Deleted")
-                    .description(format!("Stopped tracking `{code}`.\n{revoke_status}")),
+                    .description(format!(
+                        "Stopped tracking `{code}` without deleting its analytics history.\n\
+                         {revoke_status}"
+                    )),
             )
             .ephemeral(true),
     )

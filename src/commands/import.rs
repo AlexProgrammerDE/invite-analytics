@@ -6,9 +6,10 @@ use serde_json::json;
 
 use crate::audit::send_log_message;
 use crate::csv_transfer;
+use crate::discord_api::DiscordInvite;
 use crate::embeds;
 use crate::invite_tracking::normalize_invite_code;
-use crate::models::NewTrackedInvite;
+use crate::models::{NewTrackedInvite, RoleAssignmentMode};
 use crate::{Context, Error};
 
 const MAX_CSV_BYTES: u32 = 2 * 1024 * 1024;
@@ -26,7 +27,7 @@ pub async fn import(_ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-/// Import one existing Discord invite.
+/// Import one existing Discord invite with its current Discord metadata.
 #[poise::command(slash_command, guild_only)]
 #[allow(clippy::too_many_lines)]
 pub async fn single(
@@ -38,12 +39,11 @@ pub async fn single(
     #[description = "Secondary source"]
     #[max_length = 100]
     secondary_source: String,
-    #[description = "Role to assign when someone joins through this invite"] role: Option<
-        serenity::Role,
-    >,
+    #[description = "Optional managed role for future joins"] role: Option<serenity::Role>,
 ) -> Result<(), Error> {
     let guild_id = ctx.guild_id().context("command is missing a guild ID")?;
     let guild_id_string = guild_id.to_string();
+    ctx.defer_ephemeral().await?;
     let code = normalize_invite_code(&code);
     ctx.data().repository.ensure_guild(&guild_id_string).await?;
     let config = ctx
@@ -81,8 +81,10 @@ pub async fn single(
         return Ok(());
     }
 
-    let Some(discord_invite) = guild_id
-        .invites(&ctx.serenity_context().http)
+    let Some(discord_invite) = ctx
+        .data()
+        .discord_api
+        .guild_invites(guild_id.get())
         .await?
         .into_iter()
         .find(|invite| invite.code == code)
@@ -98,29 +100,28 @@ pub async fn single(
         return Ok(());
     };
 
-    let role_ids = role
-        .as_ref()
-        .map(|role| vec![role.id.to_string()])
-        .unwrap_or_default();
-    let uses = i32::try_from(discord_invite.uses)
-        .context("the invite use count exceeds the supported range")?;
-    ctx.data()
-        .repository
-        .insert_invite(&NewTrackedInvite {
-            guild_id: guild_id_string.clone(),
-            invite_code: code.clone(),
-            channel_id: discord_invite.channel.id.to_string(),
-            primary_source: primary_source.clone(),
-            secondary_source: secondary_source.clone(),
-            created_by: ctx.author().id.to_string(),
-            uses,
-            created_at: Some(discord_invite.created_at.naive_utc()),
-            role_ids,
-        })
-        .await?;
+    let tracked = new_tracked_invite(
+        &guild_id_string,
+        &primary_source,
+        &secondary_source,
+        &ctx.author().id.to_string(),
+        &discord_invite,
+        None,
+    );
+    let inserted = ctx.data().repository.insert_invite(&tracked).await?;
+    if let Some(role) = role {
+        ctx.data()
+            .repository
+            .replace_managed_roles(inserted.id, &[role.id.to_string()])
+            .await?;
+    }
     ctx.data()
         .cache
-        .set_invite(&guild_id_string, &code, discord_invite.uses)
+        .set_invite(
+            &guild_id_string,
+            &code,
+            u64::try_from(discord_invite.uses).unwrap_or_default(),
+        )
         .await?;
     ctx.data()
         .repository
@@ -132,8 +133,7 @@ pub async fn single(
                 "inviteCode": code,
                 "primarySource": primary_source,
                 "secondarySource": secondary_source,
-                "uses": uses,
-                "roleId": role.as_ref().map(|value| value.id.to_string()),
+                "discordUses": discord_invite.uses,
             })),
         )
         .await?;
@@ -167,7 +167,7 @@ pub async fn single(
     Ok(())
 }
 
-/// Import existing Discord invites from an `InviteAnalytics` CSV export.
+/// Import active Discord invites from an `InviteAnalytics` CSV export.
 #[poise::command(slash_command, guild_only)]
 #[allow(clippy::too_many_lines)]
 pub async fn csv(
@@ -200,7 +200,6 @@ pub async fn csv(
     let guild_id = ctx.guild_id().context("command is missing a guild ID")?;
     let guild_id_string = guild_id.to_string();
     ctx.defer_ephemeral().await?;
-
     let bytes = ctx
         .data()
         .attachment_client
@@ -220,7 +219,7 @@ pub async fn csv(
         return Ok(());
     }
 
-    let rows = csv_transfer::parse_import(&bytes)?;
+    let rows = csv_transfer::parse_invite_import(&bytes)?;
     if rows.is_empty() {
         ctx.send(
             poise::CreateReply::default()
@@ -245,8 +244,10 @@ pub async fn csv(
         .repository
         .count_invites(&guild_id_string)
         .await?;
-    let discord_invites = guild_id
-        .invites(&ctx.serenity_context().http)
+    let discord_invites = ctx
+        .data()
+        .discord_api
+        .guild_invites(guild_id.get())
         .await?
         .into_iter()
         .map(|invite| (invite.code.clone(), invite))
@@ -288,37 +289,36 @@ pub async fn csv(
             );
             continue;
         };
-        let Ok(uses) = i32::try_from(discord_invite.uses) else {
-            errors += 1;
-            tracing::warn!(
-                code = %row.invite_code,
-                uses = discord_invite.uses,
-                "could not import an invite with an unsupported use count"
-            );
-            continue;
-        };
 
-        let new_invite = NewTrackedInvite {
-            guild_id: guild_id_string.clone(),
-            invite_code: row.invite_code.clone(),
-            channel_id: discord_invite.channel.id.to_string(),
-            primary_source: row.primary_source,
-            secondary_source: row.secondary_source,
-            created_by: row.creator_id,
-            uses,
-            created_at: row
-                .created_at
-                .or_else(|| Some(discord_invite.created_at.naive_utc())),
-            role_ids: row.role_ids,
-        };
+        let new_invite = new_tracked_invite(
+            &guild_id_string,
+            &row.primary_source,
+            &row.secondary_source,
+            &row.tracked_by,
+            discord_invite,
+            row.tracked_at,
+        );
         match ctx.data().repository.insert_invite(&new_invite).await {
-            Ok(_) => {
+            Ok(inserted) => {
+                if !row.role_ids.is_empty()
+                    && let Err(error) = ctx
+                        .data()
+                        .repository
+                        .replace_managed_roles(inserted.id, &row.role_ids)
+                        .await
+                {
+                    tracing::warn!(
+                        %error,
+                        code = %row.invite_code,
+                        "failed to restore managed invite roles"
+                    );
+                }
                 ctx.data()
                     .cache
                     .set_invite(
                         &guild_id_string,
                         &new_invite.invite_code,
-                        discord_invite.uses,
+                        u64::try_from(discord_invite.uses).unwrap_or_default(),
                     )
                     .await?;
                 imported += 1;
@@ -361,21 +361,50 @@ pub async fn csv(
     }
     ctx.send(poise::CreateReply::default().embed(embed).ephemeral(true))
         .await?;
-    send_log_message(
-        &ctx.serenity_context().http,
-        &ctx.data().repository,
-        &guild_id_string,
-        embeds::log(
-            "CSV Import Complete",
-            format!(
-                "<@{}> imported **{imported}** of **{total}** rows. \
-                 Skipped: **{skipped}**, errors: **{errors}**.",
-                ctx.author().id
-            ),
-        ),
-    )
-    .await;
     Ok(())
+}
+
+fn new_tracked_invite(
+    guild_id: &str,
+    primary_source: &str,
+    secondary_source: &str,
+    tracked_by: &str,
+    invite: &DiscordInvite,
+    tracked_at: Option<chrono::NaiveDateTime>,
+) -> NewTrackedInvite {
+    NewTrackedInvite {
+        guild_id: guild_id.to_owned(),
+        invite_code: invite.code.clone(),
+        channel_id: invite.channel.id.clone(),
+        channel_type: invite.channel.kind,
+        primary_source: primary_source.to_owned(),
+        secondary_source: secondary_source.to_owned(),
+        tracked_by: tracked_by.to_owned(),
+        discord_inviter_id: invite.inviter.as_ref().map(|user| user.id.clone()),
+        discord_created_at: Some(invite.created_at.naive_utc()),
+        discord_uses: invite.uses,
+        max_uses: invite.max_uses,
+        max_age: invite.max_age,
+        temporary: invite.temporary,
+        expires_at: invite.expires_at.map(|value| value.naive_utc()),
+        invite_type: invite.invite_type,
+        flags: invite.flags,
+        target_type: invite.target_type,
+        target_user_id: invite.target_user.as_ref().map(|user| user.id.clone()),
+        target_application_id: invite
+            .target_application
+            .as_ref()
+            .map(|application| application.id.clone()),
+        scheduled_event_id: invite
+            .guild_scheduled_event
+            .as_ref()
+            .map(|event| event.id.clone()),
+        targeted_user_count: None,
+        is_vanity: false,
+        tracked_at,
+        role_ids: invite.roles.iter().map(|role| role.id.clone()).collect(),
+        role_assignment_mode: RoleAssignmentMode::Native,
+    }
 }
 
 fn push_skip_detail(details: &mut Vec<String>, value: String) {

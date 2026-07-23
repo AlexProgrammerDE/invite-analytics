@@ -6,13 +6,21 @@ use crate::csv_transfer;
 use crate::embeds;
 use crate::{Context, Error};
 
-/// Export all tracked invites as a CSV file.
+/// Export invite configuration or raw membership sessions.
 #[poise::command(
     slash_command,
     guild_only,
+    subcommands("invites", "joins"),
     default_member_permissions = "ADMINISTRATOR"
 )]
-pub async fn export(ctx: Context<'_>) -> Result<(), Error> {
+#[allow(clippy::unused_async)]
+pub async fn export(_ctx: Context<'_>) -> Result<(), Error> {
+    Ok(())
+}
+
+/// Export all tracked invite metadata as CSV.
+#[poise::command(slash_command, guild_only)]
+pub async fn invites(ctx: Context<'_>) -> Result<(), Error> {
     let guild_id = ctx.guild_id().context("command is missing a guild ID")?;
     let guild_id = guild_id.to_string();
     ctx.defer_ephemeral().await?;
@@ -28,16 +36,51 @@ pub async fn export(ctx: Context<'_>) -> Result<(), Error> {
         return Ok(());
     }
 
-    let invite_count = invites.len();
-    let csv = csv_transfer::write_export(&invites)?;
+    let count = invites.len();
+    let csv = csv_transfer::write_invite_export(&invites)?;
+    send_export(ctx, &guild_id, "invites", count, csv).await
+}
+
+/// Export attributed and unattributed membership sessions as CSV.
+#[poise::command(slash_command, guild_only)]
+pub async fn joins(ctx: Context<'_>) -> Result<(), Error> {
+    let guild_id = ctx.guild_id().context("command is missing a guild ID")?;
+    let guild_id = guild_id.to_string();
+    ctx.defer_ephemeral().await?;
+
+    let joins = ctx.data().repository.export_joins(&guild_id).await?;
+    if joins.is_empty() {
+        ctx.send(
+            poise::CreateReply::default()
+                .embed(embeds::error(
+                    "No membership sessions are available to export.",
+                ))
+                .ephemeral(true),
+        )
+        .await?;
+        return Ok(());
+    }
+
+    let count = joins.len();
+    let csv = csv_transfer::write_join_export(&joins)?;
+    send_export(ctx, &guild_id, "joins", count, csv).await
+}
+
+async fn send_export(
+    ctx: Context<'_>,
+    guild_id: &str,
+    kind: &str,
+    count: usize,
+    bytes: Vec<u8>,
+) -> Result<(), Error> {
     let filename = format!(
-        "invites-{guild_id}-{}.csv",
+        "{kind}-{guild_id}-{}.csv",
         Utc::now().format("%Y%m%d-%H%M%S")
     );
     ctx.send(
         poise::CreateReply::default()
-            .content(format!("Exported **{invite_count}** tracked invites."))
-            .attachment(serenity::CreateAttachment::bytes(csv, filename))
+            .content(format!("Exported **{count}** {kind}."))
+            .attachment(serenity::CreateAttachment::bytes(bytes, filename))
             .ephemeral(true),
     )
     .await?;

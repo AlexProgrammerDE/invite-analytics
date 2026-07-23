@@ -5,8 +5,10 @@ mod commands;
 mod config;
 mod csv_transfer;
 mod db;
+mod discord_api;
 mod embeds;
 mod events;
+mod invite_sync;
 mod invite_tracking;
 mod models;
 mod pagination;
@@ -21,6 +23,7 @@ use sqlx::postgres::PgPoolOptions;
 
 use crate::cache::AppCache;
 use crate::db::Repository;
+use crate::discord_api::DiscordApi;
 use crate::state::BotData;
 
 pub use crate::config::Config;
@@ -61,9 +64,11 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
         .build()
         .context("failed to build the attachment HTTP client")?;
 
+    let discord_api = DiscordApi::new(&config.discord_token)?;
     let data = BotData::new(
         Repository::new(pool),
         AppCache::new(redis),
+        discord_api,
         attachment_client,
     );
 
@@ -92,6 +97,7 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
                     );
 
                     events::initialize_guilds(ctx, ready, &data).await;
+                    invite_sync::start_reconciliation_loop(data.clone());
                     Ok(data)
                 })
             }

@@ -1,6 +1,7 @@
 use anyhow::Context as _;
 use chrono::{Duration, Utc};
 
+use crate::commands::support::format_percentage;
 use crate::embeds;
 use crate::models::SourceCount;
 use crate::{Context, Error};
@@ -16,12 +17,22 @@ pub enum StatsPeriod {
 }
 
 impl StatsPeriod {
-    fn days(self) -> Option<i64> {
+    pub(crate) const fn days(self) -> Option<i64> {
         match self {
             Self::SevenDays => Some(7),
             Self::ThirtyDays => Some(30),
             Self::AllTime => None,
         }
+    }
+
+    pub(crate) fn since(self) -> Option<chrono::NaiveDateTime> {
+        self.days()
+            .map(|days| Utc::now().naive_utc() - Duration::days(days))
+    }
+
+    pub(crate) fn label(self) -> String {
+        self.days()
+            .map_or_else(|| "All time".to_owned(), |days| format!("Last {days} days"))
     }
 }
 
@@ -42,26 +53,13 @@ pub async fn stats(
         .repository
         .count_invites(&guild_id_string)
         .await?;
-    if total_invites == 0 {
-        ctx.send(
-            poise::CreateReply::default()
-                .embed(embeds::error(
-                    "No invites are tracked yet. Use `/create` to get started.",
-                ))
-                .ephemeral(true),
-        )
-        .await?;
-        return Ok(());
-    }
 
     let period = period.unwrap_or(StatsPeriod::ThirtyDays);
-    let since = period
-        .days()
-        .map(|days| Utc::now().naive_utc() - Duration::days(days));
-    let total_joins = ctx
+    let since = period.since();
+    let counts = ctx
         .data()
         .repository
-        .count_joins(&guild_id_string, since)
+        .analytics_counts(&guild_id_string, since)
         .await?;
     let top_primary = ctx
         .data()
@@ -77,15 +75,17 @@ pub async fn stats(
     let guild_name = ctx
         .guild()
         .map_or_else(|| "this server".to_owned(), |guild| guild.name.clone());
-    let period_label = period
-        .days()
-        .map_or_else(|| "All time".to_owned(), |days| format!("Last {days} days"));
+    let period_label = period.label();
+    let attribution_rate = format_percentage(counts.attributed, counts.total);
     let embed = embeds::brand()
         .title(format!("Invite Stats for {guild_name}"))
         .description(format!("Showing statistics for **{period_label}**"))
-        .field("Total Tracked Invites", total_invites.to_string(), true)
-        .field("Total Joins", total_joins.to_string(), true)
-        .field("\u{200b}", "\u{200b}", true)
+        .field("Active Tracked Invites", total_invites.to_string(), true)
+        .field("Human Joins", counts.total.to_string(), true)
+        .field("Attributed", counts.attributed.to_string(), true)
+        .field("Unattributed", counts.unattributed.to_string(), true)
+        .field("Attribution Rate", attribution_rate, true)
+        .field("Automated/System Joins", counts.bots.to_string(), true)
         .field("Top Primary Sources", format_sources(&top_primary), false)
         .field(
             "Top Secondary Sources",
