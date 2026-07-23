@@ -1,5 +1,3 @@
-node_modules/
-dist/
 .env
-*.ttf
-!src/graph/fonts/.gitkeep
+target/
+.sqlx/
