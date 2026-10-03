@@ -950,11 +950,9 @@ mod tests {
 
         sync.role_ids.clear();
         repository.sync_invite("1", &sync).await?;
-        assert!(
-            repository
-                .native_invite_role_ids(invite.id)
-                .await?
-                .is_empty()
+        assert_eq!(
+            repository.native_invite_role_ids(invite.id).await?,
+            Vec::<String>::new()
         );
         assert_eq!(
             repository.managed_invite_role_ids(invite.id).await?,
