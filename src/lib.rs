@@ -76,8 +76,12 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
         .options(poise::FrameworkOptions {
             commands: commands::all(),
             on_error: |error| Box::pin(events::handle_framework_error(error)),
-            event_handler: |ctx, event, _framework, data| {
-                Box::pin(events::handle_event(ctx, event, data))
+            event_handler: |framework, event| {
+                Box::pin(events::handle_event(
+                    framework.serenity_context,
+                    event,
+                    framework.user_data,
+                ))
             },
             ..Default::default()
         })
