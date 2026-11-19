@@ -13,7 +13,10 @@ use crate::{Context, Error};
     subcommands("invites", "joins"),
     default_member_permissions = "ADMINISTRATOR"
 )]
-#[allow(clippy::unused_async)]
+#[expect(
+    clippy::unused_async,
+    reason = "Poise requires an async command handler even when the parent only groups subcommands"
+)]
 pub async fn export(_ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }

@@ -88,7 +88,6 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
         .setup({
             let data = data.clone();
             move |ctx, ready, framework| {
-                let data = data.clone();
                 Box::pin(async move {
                     poise::builtins::register_globally(ctx, &framework.options().commands)
                         .await

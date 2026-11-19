@@ -22,14 +22,20 @@ const MAX_SKIP_DETAILS: usize = 10;
     subcommands("single", "csv"),
     default_member_permissions = "ADMINISTRATOR"
 )]
-#[allow(clippy::unused_async)]
+#[expect(
+    clippy::unused_async,
+    reason = "Poise requires an async command handler even when the parent only groups subcommands"
+)]
 pub async fn import(_ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
 /// Import one existing Discord invite with its current Discord metadata.
 #[poise::command(slash_command, guild_only)]
-#[allow(clippy::too_many_lines)]
+#[expect(
+    clippy::too_many_lines,
+    reason = "the command validates and imports a single invite before sending one reply"
+)]
 pub async fn single(
     ctx: Context<'_>,
     #[description = "Existing invite code or URL"] code: String,
@@ -169,7 +175,10 @@ pub async fn single(
 
 /// Import active Discord invites from an `InviteAnalytics` CSV export.
 #[poise::command(slash_command, guild_only)]
-#[allow(clippy::too_many_lines)]
+#[expect(
+    clippy::too_many_lines,
+    reason = "the command validates and imports CSV rows before sending one summary"
+)]
 pub async fn csv(
     ctx: Context<'_>,
     #[description = "CSV file to import"]

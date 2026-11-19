@@ -32,7 +32,14 @@ impl InviteTarget {
     guild_only,
     default_member_permissions = "ADMINISTRATOR"
 )]
-#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "each argument is a Discord slash command option"
+)]
+#[expect(
+    clippy::too_many_lines,
+    reason = "the command creates and persists an invite before sending one reply"
+)]
 pub async fn create(
     ctx: Context<'_>,
     #[description = "Primary source, such as Instagram, YouTube, or Discord"]

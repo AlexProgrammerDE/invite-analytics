@@ -111,9 +111,12 @@ pub fn render_bar_chart(title: &str, data: &[SourceCount]) -> anyhow::Result<Vec
 fn register_fonts() -> anyhow::Result<()> {
     let result = FONTS.get_or_init(|| {
         plotters::style::register_font("Noto Sans", FontStyle::Normal, ttf_noto_sans::REGULAR)
-            .map_err(|_| "failed to register the regular chart font".to_owned())?;
-        plotters::style::register_font("Noto Sans", FontStyle::Bold, ttf_noto_sans::BOLD)
-            .map_err(|_| "failed to register the bold chart font".to_owned())
+            .map_err(|_invalid_font| {
+                "failed to register the regular chart font: invalid font data".to_owned()
+            })?;
+        plotters::style::register_font("Noto Sans", FontStyle::Bold, ttf_noto_sans::BOLD).map_err(
+            |_invalid_font| "failed to register the bold chart font: invalid font data".to_owned(),
+        )
     });
 
     result.clone().map_err(anyhow::Error::msg)

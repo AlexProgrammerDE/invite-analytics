@@ -4,8 +4,13 @@ use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    dotenvy::dotenv().ok();
+    let dotenv_result = dotenvy::dotenv();
     init_tracing();
+    if let Err(error) = dotenv_result
+        && !error.not_found()
+    {
+        tracing::warn!(%error, "failed to load .env");
+    }
 
     let config = Config::from_env().context("invalid application configuration")?;
     invite_analytics::run(config).await

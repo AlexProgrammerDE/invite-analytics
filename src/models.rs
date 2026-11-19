@@ -16,7 +16,7 @@ pub struct GuildConfig {
     pub updated_at: NaiveDateTime,
 }
 
-#[allow(
+#[expect(
     clippy::struct_excessive_bools,
     reason = "independent Discord invite state fields map directly to database columns"
 )]
@@ -171,7 +171,7 @@ pub struct RetentionCount {
     pub active: i64,
 }
 
-#[allow(
+#[expect(
     clippy::struct_excessive_bools,
     reason = "the export mirrors independent persisted invite-state fields"
 )]

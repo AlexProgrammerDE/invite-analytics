@@ -121,18 +121,18 @@ fn bucket_daily_counts(counts: &[DailyCount], max_buckets: usize) -> Vec<SourceC
     let bucket_size = counts.len().div_ceil(max_buckets);
     counts
         .chunks(bucket_size)
-        .map(|bucket| {
-            let first = bucket.first().expect("chunks are never empty");
-            let last = bucket.last().expect("chunks are never empty");
+        .filter_map(|bucket| {
+            let first = bucket.first()?;
+            let last = bucket.last()?;
             let source = if first.day == last.day {
                 first.day.format("%Y-%m-%d").to_string()
             } else {
                 format!("{}-{}", first.day.format("%m-%d"), last.day.format("%m-%d"))
             };
-            SourceCount {
+            Some(SourceCount {
                 source,
                 joins: bucket.iter().map(|count| count.joins).sum(),
-            }
+            })
         })
         .collect()
 }
