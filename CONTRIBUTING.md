@@ -16,6 +16,7 @@ Keep each change focused. Avoid unrelated formatting and dependency updates.
 Install Rust through Rustup. The toolchain is pinned in `rust-toolchain.toml`. Runtime integration needs PostgreSQL, Redis, and a test Discord guild.
 
 Run the commands below from the repository root unless a command names another directory.
+Install Lefthook and run `lefthook install` from the repository root to enable the Git hooks.
 On Windows, use `gradlew.bat` in place of `./gradlew` for Gradle commands.
 
 ## Repository layout
