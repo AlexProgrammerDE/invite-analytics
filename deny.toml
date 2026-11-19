@@ -6,13 +6,6 @@ unmaintained = "workspace"
 unsound = "all"
 yanked = "deny"
 ignore = [
-    { id = "RUSTSEC-2026-0049", reason = "Serenity's gateway uses rustls-webpki 0.102 through rustls 0.22. The fix requires an upstream TLS upgrade." },
-    { id = "RUSTSEC-2026-0098", reason = "Serenity's gateway uses rustls-webpki 0.102 through rustls 0.22. The fix requires an upstream TLS upgrade." },
-    { id = "RUSTSEC-2026-0099", reason = "Serenity's gateway uses rustls-webpki 0.102 through rustls 0.22. The fix requires an upstream TLS upgrade." },
-    { id = "RUSTSEC-2026-0104", reason = "Serenity's gateway uses rustls-webpki 0.102 through rustls 0.22. The fix requires an upstream TLS upgrade." },
-    { id = "RUSTSEC-2026-0346", reason = "Serenity's gateway uses tokio-tungstenite 0.21, which requires rustls 0.22. The fix requires rustls 0.23." },
-    { id = "RUSTSEC-2026-0349", reason = "Serenity's gateway uses tokio-tungstenite 0.21, which requires rustls 0.22. The fix requires rustls 0.23." },
-    { id = "RUSTSEC-2026-0382", reason = "Serenity's gateway uses rustls-webpki 0.102 through rustls 0.22. The fix requires an upstream TLS upgrade." },
     { id = "RUSTSEC-2026-0543", reason = "All Chrono versions are unmaintained. Replacing Chrono requires changes to the bot's time handling and SQLx mappings." },
 ]
 

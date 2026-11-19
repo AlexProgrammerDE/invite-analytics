@@ -6,6 +6,8 @@ It uses PostgreSQL for persistent data and Redis for cached state.
 ## Prepare a test environment
 
 Install Rust through Rustup. The repository pins its toolchain in `rust-toolchain.toml`.
+On Linux, install the OpenSSL development package and `pkg-config` before you build.
+On Debian or Ubuntu, install `libssl-dev`, `pkg-config`, and `ca-certificates`.
 Create a separate Discord bot and guild for development. Start local PostgreSQL and Redis services.
 
 Copy `.env.example` to an ignored `.env` file. Set these variables:
