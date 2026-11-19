@@ -4,7 +4,7 @@ use serde_json::json;
 
 use crate::commands::support::download_target_users;
 use crate::embeds;
-use crate::invite_tracking::normalize_invite_code;
+use crate::invite_code::normalize_invite_code;
 use crate::{Context, Error};
 
 /// Manage the users allowed to accept a targeted invite.

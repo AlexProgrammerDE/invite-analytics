@@ -2,7 +2,7 @@ use anyhow::Context as _;
 use poise::serenity_prelude as serenity;
 
 use crate::embeds;
-use crate::invite_tracking::normalize_invite_code;
+use crate::invite_code::normalize_invite_code;
 use crate::models::{InviteUse, TrackedInvite};
 use crate::{Context, Error};
 

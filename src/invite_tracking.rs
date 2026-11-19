@@ -118,22 +118,11 @@ pub fn attribute_invite(
     }
 }
 
-pub fn normalize_invite_code(value: &str) -> String {
-    let trimmed = value
-        .trim()
-        .split(['?', '#'])
-        .next()
-        .unwrap_or_default()
-        .trim_end_matches('/');
-    let code = trimmed.rsplit('/').next().unwrap_or(trimmed);
-    code.trim().to_owned()
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
 
-    use super::{AttributionReason, attribute_invite, normalize_invite_code};
+    use super::{AttributionReason, attribute_invite};
 
     #[test]
     fn attributes_a_single_increase() {
@@ -219,19 +208,5 @@ mod tests {
             attribution.reason,
             AttributionReason::AmbiguousCounterIncrease
         );
-    }
-
-    #[test]
-    fn normalizes_common_invite_inputs() {
-        assert_eq!(normalize_invite_code("abc123"), "abc123");
-        assert_eq!(
-            normalize_invite_code("https://discord.gg/abc123/"),
-            "abc123"
-        );
-        assert_eq!(
-            normalize_invite_code("discord.com/invite/abc123/?event=42"),
-            "abc123"
-        );
-        assert_eq!(normalize_invite_code("discord.gg/abc123#details"), "abc123");
     }
 }

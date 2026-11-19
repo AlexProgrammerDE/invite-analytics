@@ -5,7 +5,7 @@ use serde_json::json;
 use crate::audit::send_log_message;
 use crate::commands::support::unique_role_ids;
 use crate::embeds;
-use crate::invite_tracking::normalize_invite_code;
+use crate::invite_code::normalize_invite_code;
 use crate::{Context, Error};
 
 /// Edit source labels or managed fallback roles.

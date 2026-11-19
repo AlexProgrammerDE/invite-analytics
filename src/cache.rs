@@ -1,3 +1,5 @@
+#![warn(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
+
 use std::collections::HashMap;
 
 use anyhow::Context as _;
@@ -277,8 +279,11 @@ mod tests {
         cache.remember_deleted_invite(guild_id, "limited").await?;
         assert!(cache.invite_snapshot(guild_id).await?.is_empty());
         assert_eq!(
-            cache.recently_deleted_invites(guild_id).await?["limited"],
-            0
+            cache
+                .recently_deleted_invites(guild_id)
+                .await?
+                .get("limited"),
+            Some(&0)
         );
 
         cache

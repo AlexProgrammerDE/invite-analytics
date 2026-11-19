@@ -8,6 +8,7 @@ mod db;
 mod discord_api;
 mod embeds;
 mod events;
+mod invite_code;
 mod invite_sync;
 mod invite_tracking;
 mod models;
@@ -33,6 +34,13 @@ pub type Context<'a> = poise::Context<'a, BotData, Error>;
 
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!();
 
+fn http_client_builder() -> reqwest::ClientBuilder {
+    reqwest::Client::builder()
+        .user_agent(concat!("invite-analytics/", env!("CARGO_PKG_VERSION")))
+        .connect_timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(30))
+}
+
 /// Start the bot and run it until the Discord gateway stops.
 ///
 /// # Errors
@@ -57,10 +65,7 @@ pub async fn run(config: Config) -> anyhow::Result<()> {
         .await
         .context("failed to connect to Redis")?;
 
-    let attachment_client = reqwest::Client::builder()
-        .user_agent(concat!("invite-analytics/", env!("CARGO_PKG_VERSION")))
-        .connect_timeout(Duration::from_secs(10))
-        .timeout(Duration::from_secs(30))
+    let attachment_client = http_client_builder()
         .build()
         .context("failed to build the attachment HTTP client")?;
 

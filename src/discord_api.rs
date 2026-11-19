@@ -1,3 +1,5 @@
+#![warn(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
+
 use std::time::Duration;
 
 use anyhow::{Context as _, bail};
@@ -23,11 +25,8 @@ impl DiscordApi {
         authorization.set_sensitive(true);
         headers.insert(AUTHORIZATION, authorization);
 
-        let client = reqwest::Client::builder()
+        let client = crate::http_client_builder()
             .default_headers(headers)
-            .user_agent(concat!("invite-analytics/", env!("CARGO_PKG_VERSION")))
-            .connect_timeout(Duration::from_secs(10))
-            .timeout(Duration::from_secs(30))
             .build()
             .context("failed to build the Discord API client")?;
         Ok(Self { client })
@@ -132,7 +131,9 @@ impl DiscordApi {
                 Err(error) if attempt < MAX_REQUEST_ATTEMPTS => {
                     tracing::warn!(%error, attempt, "Discord API request failed; retrying");
                     tokio::time::sleep(transient_delay).await;
-                    transient_delay *= 2;
+                    transient_delay = transient_delay
+                        .checked_mul(2)
+                        .context("Discord API retry delay overflow")?;
                     continue;
                 }
                 Err(error) => return Err(error).context("Discord API request failed"),
@@ -160,7 +161,9 @@ impl DiscordApi {
             if status.is_server_error() && attempt < MAX_REQUEST_ATTEMPTS {
                 tracing::warn!(%status, attempt, "Discord API server error; retrying");
                 tokio::time::sleep(transient_delay).await;
-                transient_delay *= 2;
+                transient_delay = transient_delay
+                    .checked_mul(2)
+                    .context("Discord API retry delay overflow")?;
                 continue;
             }
 

@@ -1,3 +1,14 @@
 allow-unwrap-in-tests = true
 allow-expect-in-tests = true
 allow-panic-in-tests = true
+
+disallowed-methods = [
+    { path = "std::env::set_var", reason = "Pass configuration explicitly because changing the process environment is unsound with threads" },
+    { path = "std::env::remove_var", reason = "Pass configuration explicitly because changing the process environment is unsound with threads" },
+    { path = "std::thread::sleep", reason = "Use tokio::time::sleep to avoid blocking an async worker" },
+    { path = "std::process::Command::output", reason = "Use tokio::process::Command to avoid blocking an async worker" },
+    { path = "std::process::Command::status", reason = "Use tokio::process::Command to avoid blocking an async worker" },
+    { path = "std::process::Command::spawn", reason = "Use tokio::process::Command to manage child processes asynchronously" },
+    { path = "reqwest::Client::new", reason = "Use crate::http_client_builder for explicit connect and request timeouts" },
+    { path = "reqwest::get", reason = "Use a client from crate::http_client_builder for explicit connect and request timeouts" },
+]

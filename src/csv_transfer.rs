@@ -1,8 +1,10 @@
+#![warn(clippy::indexing_slicing, clippy::arithmetic_side_effects)]
+
 use anyhow::{Context as _, bail};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::invite_tracking::normalize_invite_code;
+use crate::invite_code::normalize_invite_code;
 use crate::models::{ExportInvite, ExportJoin};
 
 const MAX_IMPORT_ROWS: usize = 1_000;
@@ -133,14 +135,15 @@ pub fn parse_invite_import(bytes: &[u8]) -> anyhow::Result<Vec<ImportedInvite>> 
             bail!("CSV files can contain at most {MAX_IMPORT_ROWS} rows");
         }
 
-        let record = result.with_context(|| format!("invalid CSV record on row {}", index + 2))?;
+        let row_number = index.checked_add(2).context("CSV row number overflow")?;
+        let record = result.with_context(|| format!("invalid CSV record on row {row_number}"))?;
         let invite_code = normalize_invite_code(&record.invite_code);
         if invite_code.is_empty()
             || record.primary_source.is_empty()
             || record.secondary_source.is_empty()
             || record.tracked_by.is_empty()
         {
-            bail!("row {} has a missing required value", index + 2);
+            bail!("row {row_number} has a missing required value");
         }
 
         rows.push(ImportedInvite {
@@ -149,7 +152,7 @@ pub fn parse_invite_import(bytes: &[u8]) -> anyhow::Result<Vec<ImportedInvite>> 
             secondary_source: record.secondary_source,
             tracked_by: record.tracked_by,
             tracked_at: parse_date(&record.tracked_at)
-                .with_context(|| format!("invalid tracking time on row {}", index + 2))?,
+                .with_context(|| format!("invalid tracking time on row {row_number}"))?,
             role_ids: record
                 .managed_role_ids
                 .split(';')
@@ -269,6 +272,14 @@ mod tests {
     use crate::models::ExportInvite;
 
     #[test]
+    fn reports_the_row_number_for_a_truncated_record() {
+        let bytes = b"Invite Code,Primary Source,Secondary Source,Tracked By\nfirst,video,launch,123\nsecond,video";
+        let error = parse_invite_import(bytes).unwrap_err();
+
+        assert_eq!(error.to_string(), "invalid CSV record on row 3");
+    }
+
+    #[test]
     fn invite_export_round_trips_quoted_values() {
         let created_at = NaiveDate::from_ymd_opt(2026, 7, 23)
             .unwrap()
@@ -310,12 +321,14 @@ mod tests {
         let bytes = write_invite_export(std::slice::from_ref(&original)).unwrap();
         let parsed = parse_invite_import(&bytes).unwrap();
 
-        assert_eq!(parsed.len(), 1);
-        assert_eq!(parsed[0].invite_code, original.invite_code);
-        assert_eq!(parsed[0].primary_source, original.primary_source);
-        assert_eq!(parsed[0].secondary_source, original.secondary_source);
-        assert_eq!(parsed[0].tracked_by, original.tracked_by);
-        assert_eq!(parsed[0].tracked_at, Some(original.tracked_at));
-        assert_eq!(parsed[0].role_ids, original.managed_role_ids);
+        let [parsed] = parsed.as_slice() else {
+            panic!("expected exactly one imported invite");
+        };
+        assert_eq!(parsed.invite_code, original.invite_code);
+        assert_eq!(parsed.primary_source, original.primary_source);
+        assert_eq!(parsed.secondary_source, original.secondary_source);
+        assert_eq!(parsed.tracked_by, original.tracked_by);
+        assert_eq!(parsed.tracked_at, Some(original.tracked_at));
+        assert_eq!(parsed.role_ids, original.managed_role_ids);
     }
 }

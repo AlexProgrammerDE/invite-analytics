@@ -8,7 +8,7 @@ use crate::audit::send_log_message;
 use crate::csv_transfer;
 use crate::discord_api::DiscordInvite;
 use crate::embeds;
-use crate::invite_tracking::normalize_invite_code;
+use crate::invite_code::normalize_invite_code;
 use crate::models::{NewTrackedInvite, RoleAssignmentMode};
 use crate::{Context, Error};
 

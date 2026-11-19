@@ -3,7 +3,7 @@ use serde_json::json;
 
 use crate::audit::send_log_message;
 use crate::embeds;
-use crate::invite_tracking::normalize_invite_code;
+use crate::invite_code::normalize_invite_code;
 use crate::{Context, Error};
 
 /// Stop tracking an invite and optionally revoke it on Discord.
