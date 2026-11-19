@@ -301,6 +301,10 @@ async fn resolve_join_attribution(
     } else {
         let mut current_counts = snapshot.counts;
         if !snapshot.vanity_fetch_succeeded {
+            #[expect(
+                clippy::iter_over_hash_type,
+                reason = "Each cached count fills a distinct missing key before attribution"
+            )]
             for (code, uses) in &cached {
                 current_counts.entry(code.clone()).or_insert(*uses);
             }

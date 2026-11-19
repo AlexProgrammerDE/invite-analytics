@@ -50,6 +50,10 @@ impl AppCache {
         let mut pipeline = redis::pipe();
         pipeline.atomic().del(&key).ignore();
         pipeline.hset(&key, SNAPSHOT_READY_FIELD, 1_u8).ignore();
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "Each HSET writes a distinct field in the same Redis transaction"
+        )]
         for (code, uses) in invites {
             pipeline.hset(&key, code, *uses).ignore();
         }
@@ -128,6 +132,10 @@ impl AppCache {
         let now = Utc::now().timestamp();
         let mut active = HashMap::new();
         let mut stale = Vec::new();
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "Each field is classified independently and expired fields are deleted by key"
+        )]
         for (code, value) in values {
             if let Some(uses) = parse_deleted_invite_value(&value, now) {
                 active.insert(code, uses);

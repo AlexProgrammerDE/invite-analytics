@@ -39,6 +39,6 @@ mod tests {
     #[test]
     fn rejects_missing_values() {
         let name = "INVITE_ANALYTICS_TEST_MISSING";
-        assert!(required(name).is_err());
+        required(name).expect_err("an unset environment variable must be rejected");
     }
 }

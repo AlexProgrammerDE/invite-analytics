@@ -373,6 +373,7 @@ mod tests {
             body: br#"{"type":0,"code":"missing","channel":{"id":"1","type":0}}"#.to_vec(),
         };
 
-        assert!(decode_response::<DiscordInvite>(&response).is_err());
+        decode_response::<DiscordInvite>(&response)
+            .expect_err("invite response missing usage metadata");
     }
 }
