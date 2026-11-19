@@ -255,6 +255,10 @@ mod tests {
 
     #[tokio::test]
     #[ignore = "requires a local Redis server"]
+    #[expect(
+        clippy::panic_in_result_fn,
+        reason = "This test asserts cache state and uses ? to propagate Redis errors"
+    )]
     async fn redis_snapshot_and_deleted_invite_lifecycle_is_consistent() -> anyhow::Result<()> {
         let redis_url = std::env::var("REDIS_URL").context("REDIS_URL is required")?;
         let client = redis::Client::open(redis_url)?;

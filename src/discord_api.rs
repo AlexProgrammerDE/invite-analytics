@@ -26,8 +26,8 @@ impl DiscordApi {
         let client = reqwest::Client::builder()
             .default_headers(headers)
             .user_agent(concat!("invite-analytics/", env!("CARGO_PKG_VERSION")))
-            .connect_timeout(std::time::Duration::from_secs(10))
-            .timeout(std::time::Duration::from_secs(30))
+            .connect_timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(30))
             .build()
             .context("failed to build the Discord API client")?;
         Ok(Self { client })
@@ -167,7 +167,7 @@ impl DiscordApi {
             return Ok(ApiResponse { status, body });
         }
 
-        unreachable!("the Discord request retry loop always returns")
+        bail!("Discord API request exhausted its retry loop without a response")
     }
 }
 

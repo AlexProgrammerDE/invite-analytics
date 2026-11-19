@@ -32,6 +32,10 @@ pub async fn handle_event(
     event: &serenity::FullEvent,
     data: &BotData,
 ) -> Result<(), Error> {
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "Serenity's non-exhaustive FullEvent includes events this bot does not handle"
+    )]
     let result = match event {
         serenity::FullEvent::GuildCreate { guild, .. } => handle_guild_create(data, guild).await,
         serenity::FullEvent::GuildMemberAddition { new_member } => {
@@ -68,6 +72,10 @@ pub async fn handle_event(
 }
 
 pub async fn handle_framework_error(error: poise::FrameworkError<'_, BotData, Error>) {
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "Poise's default handler covers the other FrameworkError variants"
+    )]
     match error {
         poise::FrameworkError::Command { error, ctx, .. } => {
             tracing::error!(
