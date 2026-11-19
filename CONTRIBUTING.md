@@ -33,6 +33,9 @@ cargo clippy --all-targets --all-features --locked -- -D warnings
 cargo test --all-targets --all-features --locked
 ```
 
+Install cargo-deny 0.20.2 and run `cargo deny --locked check` to check dependencies.
+The pre-push hook runs it when `Cargo.toml`, `Cargo.lock`, or `deny.toml` changes.
+
 Use separate Discord and database resources for integration work. Cover invite attribution, cache refresh, event ordering, and CSV transfer with focused tests. Inspect ignored tests before using the CI command with `--include-ignored`. Run them only with the required test services. Keep Discord tokens, member data, and connection credentials out of reports.
 
 Run the relevant checks before review. State the command and result in the pull request.
